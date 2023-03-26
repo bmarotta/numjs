@@ -2646,7 +2646,7 @@ function generateCWiseOp(proc, typesig) {
 }
 module.exports = generateCWiseOp
 
-},{"uniq":22}],6:[function(require,module,exports){
+},{"uniq":20}],6:[function(require,module,exports){
 "use strict"
 
 // The function below is called when constructing a cwise function object, and does the following:
@@ -20204,7 +20204,7 @@ function ndfft(dir, x, y) {
 }
 
 module.exports = ndfft
-},{"./lib/fft-matrix.js":14,"ndarray":18,"ndarray-ops":17,"typedarray-pool":21}],14:[function(require,module,exports){
+},{"./lib/fft-matrix.js":14,"ndarray":18,"ndarray-ops":17,"typedarray-pool":19}],14:[function(require,module,exports){
 var bits = require('bit-twiddle')
 
 function fft(dir, nrows, ncols, buffer, x_ptr, y_ptr, scratch_ptr) {
@@ -21575,420 +21575,6 @@ function wrappedNDArrayCtor(data, shape, stride, offset) {
 module.exports = wrappedNDArrayCtor
 
 },{"iota-array":10,"is-buffer":11}],19:[function(require,module,exports){
-(function (process){
-// Copyright Joyent, Inc. and other Node contributors.
-//
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this software and associated documentation files (the
-// "Software"), to deal in the Software without restriction, including
-// without limitation the rights to use, copy, modify, merge, publish,
-// distribute, sublicense, and/or sell copies of the Software, and to permit
-// persons to whom the Software is furnished to do so, subject to the
-// following conditions:
-//
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
-// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-// USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-// resolves . and .. elements in a path array with directory names there
-// must be no slashes, empty elements, or device names (c:\) in the array
-// (so also no leading and trailing slashes - it does not distinguish
-// relative and absolute paths)
-function normalizeArray(parts, allowAboveRoot) {
-  // if the path tries to go above the root, `up` ends up > 0
-  var up = 0;
-  for (var i = parts.length - 1; i >= 0; i--) {
-    var last = parts[i];
-    if (last === '.') {
-      parts.splice(i, 1);
-    } else if (last === '..') {
-      parts.splice(i, 1);
-      up++;
-    } else if (up) {
-      parts.splice(i, 1);
-      up--;
-    }
-  }
-
-  // if the path is allowed to go above the root, restore leading ..s
-  if (allowAboveRoot) {
-    for (; up--; up) {
-      parts.unshift('..');
-    }
-  }
-
-  return parts;
-}
-
-// Split a filename into [root, dir, basename, ext], unix version
-// 'root' is just a slash, or nothing.
-var splitPathRe =
-    /^(\/?|)([\s\S]*?)((?:\.{1,2}|[^\/]+?|)(\.[^.\/]*|))(?:[\/]*)$/;
-var splitPath = function(filename) {
-  return splitPathRe.exec(filename).slice(1);
-};
-
-// path.resolve([from ...], to)
-// posix version
-exports.resolve = function() {
-  var resolvedPath = '',
-      resolvedAbsolute = false;
-
-  for (var i = arguments.length - 1; i >= -1 && !resolvedAbsolute; i--) {
-    var path = (i >= 0) ? arguments[i] : process.cwd();
-
-    // Skip empty and invalid entries
-    if (typeof path !== 'string') {
-      throw new TypeError('Arguments to path.resolve must be strings');
-    } else if (!path) {
-      continue;
-    }
-
-    resolvedPath = path + '/' + resolvedPath;
-    resolvedAbsolute = path.charAt(0) === '/';
-  }
-
-  // At this point the path should be resolved to a full absolute path, but
-  // handle relative paths to be safe (might happen when process.cwd() fails)
-
-  // Normalize the path
-  resolvedPath = normalizeArray(filter(resolvedPath.split('/'), function(p) {
-    return !!p;
-  }), !resolvedAbsolute).join('/');
-
-  return ((resolvedAbsolute ? '/' : '') + resolvedPath) || '.';
-};
-
-// path.normalize(path)
-// posix version
-exports.normalize = function(path) {
-  var isAbsolute = exports.isAbsolute(path),
-      trailingSlash = substr(path, -1) === '/';
-
-  // Normalize the path
-  path = normalizeArray(filter(path.split('/'), function(p) {
-    return !!p;
-  }), !isAbsolute).join('/');
-
-  if (!path && !isAbsolute) {
-    path = '.';
-  }
-  if (path && trailingSlash) {
-    path += '/';
-  }
-
-  return (isAbsolute ? '/' : '') + path;
-};
-
-// posix version
-exports.isAbsolute = function(path) {
-  return path.charAt(0) === '/';
-};
-
-// posix version
-exports.join = function() {
-  var paths = Array.prototype.slice.call(arguments, 0);
-  return exports.normalize(filter(paths, function(p, index) {
-    if (typeof p !== 'string') {
-      throw new TypeError('Arguments to path.join must be strings');
-    }
-    return p;
-  }).join('/'));
-};
-
-
-// path.relative(from, to)
-// posix version
-exports.relative = function(from, to) {
-  from = exports.resolve(from).substr(1);
-  to = exports.resolve(to).substr(1);
-
-  function trim(arr) {
-    var start = 0;
-    for (; start < arr.length; start++) {
-      if (arr[start] !== '') break;
-    }
-
-    var end = arr.length - 1;
-    for (; end >= 0; end--) {
-      if (arr[end] !== '') break;
-    }
-
-    if (start > end) return [];
-    return arr.slice(start, end - start + 1);
-  }
-
-  var fromParts = trim(from.split('/'));
-  var toParts = trim(to.split('/'));
-
-  var length = Math.min(fromParts.length, toParts.length);
-  var samePartsLength = length;
-  for (var i = 0; i < length; i++) {
-    if (fromParts[i] !== toParts[i]) {
-      samePartsLength = i;
-      break;
-    }
-  }
-
-  var outputParts = [];
-  for (var i = samePartsLength; i < fromParts.length; i++) {
-    outputParts.push('..');
-  }
-
-  outputParts = outputParts.concat(toParts.slice(samePartsLength));
-
-  return outputParts.join('/');
-};
-
-exports.sep = '/';
-exports.delimiter = ':';
-
-exports.dirname = function(path) {
-  var result = splitPath(path),
-      root = result[0],
-      dir = result[1];
-
-  if (!root && !dir) {
-    // No dirname whatsoever
-    return '.';
-  }
-
-  if (dir) {
-    // It has a dirname, strip trailing slash
-    dir = dir.substr(0, dir.length - 1);
-  }
-
-  return root + dir;
-};
-
-
-exports.basename = function(path, ext) {
-  var f = splitPath(path)[2];
-  // TODO: make this comparison case-insensitive on windows?
-  if (ext && f.substr(-1 * ext.length) === ext) {
-    f = f.substr(0, f.length - ext.length);
-  }
-  return f;
-};
-
-
-exports.extname = function(path) {
-  return splitPath(path)[3];
-};
-
-function filter (xs, f) {
-    if (xs.filter) return xs.filter(f);
-    var res = [];
-    for (var i = 0; i < xs.length; i++) {
-        if (f(xs[i], i, xs)) res.push(xs[i]);
-    }
-    return res;
-}
-
-// String.prototype.substr - negative index don't work in IE8
-var substr = 'ab'.substr(-1) === 'b'
-    ? function (str, start, len) { return str.substr(start, len) }
-    : function (str, start, len) {
-        if (start < 0) start = str.length + start;
-        return str.substr(start, len);
-    }
-;
-
-}).call(this,require('_process'))
-},{"_process":20}],20:[function(require,module,exports){
-// shim for using process in browser
-var process = module.exports = {};
-
-// cached from whatever global is present so that test runners that stub it
-// don't break things.  But we need to wrap it in a try catch in case it is
-// wrapped in strict mode code which doesn't define any globals.  It's inside a
-// function because try/catches deoptimize in certain engines.
-
-var cachedSetTimeout;
-var cachedClearTimeout;
-
-function defaultSetTimout() {
-    throw new Error('setTimeout has not been defined');
-}
-function defaultClearTimeout () {
-    throw new Error('clearTimeout has not been defined');
-}
-(function () {
-    try {
-        if (typeof setTimeout === 'function') {
-            cachedSetTimeout = setTimeout;
-        } else {
-            cachedSetTimeout = defaultSetTimout;
-        }
-    } catch (e) {
-        cachedSetTimeout = defaultSetTimout;
-    }
-    try {
-        if (typeof clearTimeout === 'function') {
-            cachedClearTimeout = clearTimeout;
-        } else {
-            cachedClearTimeout = defaultClearTimeout;
-        }
-    } catch (e) {
-        cachedClearTimeout = defaultClearTimeout;
-    }
-} ())
-function runTimeout(fun) {
-    if (cachedSetTimeout === setTimeout) {
-        //normal enviroments in sane situations
-        return setTimeout(fun, 0);
-    }
-    // if setTimeout wasn't available but was latter defined
-    if ((cachedSetTimeout === defaultSetTimout || !cachedSetTimeout) && setTimeout) {
-        cachedSetTimeout = setTimeout;
-        return setTimeout(fun, 0);
-    }
-    try {
-        // when when somebody has screwed with setTimeout but no I.E. maddness
-        return cachedSetTimeout(fun, 0);
-    } catch(e){
-        try {
-            // When we are in I.E. but the script has been evaled so I.E. doesn't trust the global object when called normally
-            return cachedSetTimeout.call(null, fun, 0);
-        } catch(e){
-            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error
-            return cachedSetTimeout.call(this, fun, 0);
-        }
-    }
-
-
-}
-function runClearTimeout(marker) {
-    if (cachedClearTimeout === clearTimeout) {
-        //normal enviroments in sane situations
-        return clearTimeout(marker);
-    }
-    // if clearTimeout wasn't available but was latter defined
-    if ((cachedClearTimeout === defaultClearTimeout || !cachedClearTimeout) && clearTimeout) {
-        cachedClearTimeout = clearTimeout;
-        return clearTimeout(marker);
-    }
-    try {
-        // when when somebody has screwed with setTimeout but no I.E. maddness
-        return cachedClearTimeout(marker);
-    } catch (e){
-        try {
-            // When we are in I.E. but the script has been evaled so I.E. doesn't  trust the global object when called normally
-            return cachedClearTimeout.call(null, marker);
-        } catch (e){
-            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error.
-            // Some versions of I.E. have different rules for clearTimeout vs setTimeout
-            return cachedClearTimeout.call(this, marker);
-        }
-    }
-
-
-
-}
-var queue = [];
-var draining = false;
-var currentQueue;
-var queueIndex = -1;
-
-function cleanUpNextTick() {
-    if (!draining || !currentQueue) {
-        return;
-    }
-    draining = false;
-    if (currentQueue.length) {
-        queue = currentQueue.concat(queue);
-    } else {
-        queueIndex = -1;
-    }
-    if (queue.length) {
-        drainQueue();
-    }
-}
-
-function drainQueue() {
-    if (draining) {
-        return;
-    }
-    var timeout = runTimeout(cleanUpNextTick);
-    draining = true;
-
-    var len = queue.length;
-    while(len) {
-        currentQueue = queue;
-        queue = [];
-        while (++queueIndex < len) {
-            if (currentQueue) {
-                currentQueue[queueIndex].run();
-            }
-        }
-        queueIndex = -1;
-        len = queue.length;
-    }
-    currentQueue = null;
-    draining = false;
-    runClearTimeout(timeout);
-}
-
-process.nextTick = function (fun) {
-    var args = new Array(arguments.length - 1);
-    if (arguments.length > 1) {
-        for (var i = 1; i < arguments.length; i++) {
-            args[i - 1] = arguments[i];
-        }
-    }
-    queue.push(new Item(fun, args));
-    if (queue.length === 1 && !draining) {
-        runTimeout(drainQueue);
-    }
-};
-
-// v8 likes predictible objects
-function Item(fun, array) {
-    this.fun = fun;
-    this.array = array;
-}
-Item.prototype.run = function () {
-    this.fun.apply(null, this.array);
-};
-process.title = 'browser';
-process.browser = true;
-process.env = {};
-process.argv = [];
-process.version = ''; // empty string to avoid regexp issues
-process.versions = {};
-
-function noop() {}
-
-process.on = noop;
-process.addListener = noop;
-process.once = noop;
-process.off = noop;
-process.removeListener = noop;
-process.removeAllListeners = noop;
-process.emit = noop;
-process.prependListener = noop;
-process.prependOnceListener = noop;
-
-process.listeners = function (name) { return [] }
-
-process.binding = function (name) {
-    throw new Error('process.binding is not supported');
-};
-
-process.cwd = function () { return '/' };
-process.chdir = function (dir) {
-    throw new Error('process.chdir is not supported');
-};
-process.umask = function() { return 0; };
-
-},{}],21:[function(require,module,exports){
 (function (global,Buffer){
 'use strict'
 
@@ -22205,7 +21791,7 @@ exports.clearCache = function clearCache() {
   }
 }
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},require("buffer").Buffer)
-},{"bit-twiddle":2,"buffer":3,"dup":8}],22:[function(require,module,exports){
+},{"bit-twiddle":2,"buffer":3,"dup":8}],20:[function(require,module,exports){
 "use strict"
 
 function unique_pred(list, compare) {
@@ -22264,7 +21850,7 @@ function unique(list, compare, sorted) {
 
 module.exports = unique
 
-},{}],23:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 'use strict';
 
 module.exports = {
@@ -22272,7 +21858,7 @@ module.exports = {
   nFloatingValues: 5
 };
 
-},{}],24:[function(require,module,exports){
+},{}],22:[function(require,module,exports){
 'use strict';
 
 module.exports = {
@@ -22287,7 +21873,7 @@ module.exports = {
   array: Array
 };
 
-},{}],25:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 'use strict';
 
 module.exports = {
@@ -22308,7 +21894,7 @@ module.exports = {
   }
 };
 
-},{}],26:[function(require,module,exports){
+},{}],24:[function(require,module,exports){
 'use strict';
 
 module.exports = function areaSum (h0, w0, H, W, SAT) {
@@ -22322,7 +21908,7 @@ module.exports = function areaSum (h0, w0, H, W, SAT) {
         : -SAT.selection.get(y1, x0) + SAT.selection.get(y1, x1);
 };
 
-},{}],27:[function(require,module,exports){
+},{}],25:[function(require,module,exports){
 'use strict';
 
 var areaSum = require('./area-sum');
@@ -22331,79 +21917,7 @@ module.exports = function areaValue (h0, w0, H, W, SAT) {
   return areaSum(h0, w0, H, W, SAT) / (H * W);
 };
 
-},{"./area-sum":26}],28:[function(require,module,exports){
-(function (__dirname){
-'use strict';
-var path = require('path');
-
-var read = require('./read');
-
-var DATA_DIR = path.join(path.resolve(__dirname), '../../data');
-
-function getArray (fileName) {
-  return read(path.join(DATA_DIR, fileName));
-}
-
-var exports = {};
-
-/**
-* @property {NdArray} digit - 28x28 grayscale image with an handwritten digit extracted from MNIST database
-*/
-Object.defineProperty(exports, 'digit', {
-  get: function () {
-    return getArray('five.png');
-  }
-});
-
-/**
-* @property {NdArray} five - 28x28 grayscale image with an handwritten digit extracted from MNIST database
-*/
-Object.defineProperty(exports, 'five', {
-  get: function () {
-    return getArray('five.png');
-  }
-});
-
-/**
-* @property {NdArray} node - 300x600 COLOR image representing Node.js's logo
-*/
-Object.defineProperty(exports, 'node', {
-  get: function () {
-    return getArray('nodejs.png');
-  }
-});
-
-/**
-* @property {NdArray} lena - The standard, yet sometimes controversial Lena test image was scanned from the November 1972 edition of Playboy magazine. From an image processing perspective, this image is useful because it contains smooth, textured, shaded as well as detail areas.
-*/
-Object.defineProperty(exports, 'lena', {
-  get: function () {
-    return getArray('lenna.png');
-  }
-});
-
-/**
-* @property {NdArray} lenna - The standard, yet sometimes controversial Lena test image was scanned from the November 1972 edition of Playboy magazine. From an image processing perspective, this image is useful because it contains smooth, textured, shaded as well as detail areas.
-*/
-Object.defineProperty(exports, 'lenna', {
-  get: function () {
-    return getArray('lenna.png');
-  }
-});
-
-/**
-* @property {NdArray} moon - This low-contrast image of the surface of the moon is useful for illustrating histogram equalization and contrast stretching.
-*/
-Object.defineProperty(exports, 'moon', {
-  get: function () {
-    return getArray('moon.jpg');
-  }
-});
-
-module.exports = exports;
-
-}).call(this,"/src/images")
-},{"./read":32,"path":19}],29:[function(require,module,exports){
+},{"./area-sum":24}],26:[function(require,module,exports){
 'use strict';
 
 var NdArray = require('../ndarray');
@@ -22412,7 +21926,7 @@ module.exports = function flipImage (img) {
   return new NdArray(img.selection.step(null, -1));
 };
 
-},{"../ndarray":42}],30:[function(require,module,exports){
+},{"../ndarray":39}],27:[function(require,module,exports){
 'use strict';
 
 /**
@@ -22424,7 +21938,6 @@ module.exports = function flipImage (img) {
  */
 
 module.exports = {
-  data: require('./data'),
   read: require('./read'),
   save: require('./save'),
   resize: require('./resize'),
@@ -22438,7 +21951,7 @@ module.exports = {
   flip: require('./flip')
 };
 
-},{"./area-sum":26,"./area-value":27,"./data":28,"./flip":29,"./read":32,"./resize":33,"./rgb2gray":34,"./sat":35,"./save":36,"./scharr":37,"./sobel":38,"./ssat":39}],31:[function(require,module,exports){
+},{"./area-sum":24,"./area-value":25,"./flip":26,"./read":29,"./resize":30,"./rgb2gray":31,"./sat":32,"./save":33,"./scharr":34,"./sobel":35,"./ssat":36}],28:[function(require,module,exports){
 'use strict';
 
 
@@ -22462,7 +21975,7 @@ module.exports = function isGrayscaleImage (arr) {
   return false;
 };
 
-},{"../ndarray":42,"cwise/lib/wrapper":7}],32:[function(require,module,exports){
+},{"../ndarray":39,"cwise/lib/wrapper":7}],29:[function(require,module,exports){
 'use strict';
 
 /* global HTMLCanvasElement */
@@ -22516,7 +22029,7 @@ function processImg (img) {
   return new NdArray(hxw);
 }
 
-},{"../errors":25,"../ndarray":42,"./is-grayscale":31,"ndarray":18}],33:[function(require,module,exports){
+},{"../errors":23,"../ndarray":39,"./is-grayscale":28,"ndarray":18}],30:[function(require,module,exports){
 'use strict';
 
 var _ = require('./utils');
@@ -22561,7 +22074,7 @@ module.exports = function resizeImageDom (img, height, width) {
   return new NdArray(hxw);
 };
 
-},{"../ndarray":42,"./utils":40,"ndarray":18}],34:[function(require,module,exports){
+},{"../ndarray":39,"./utils":37,"ndarray":18}],31:[function(require,module,exports){
 'use strict';
 
 
@@ -22569,7 +22082,7 @@ var NdArray = require('../ndarray');
 var __ = require('../utils');
 
 // takes ~157ms on a 5000x5000 image
-var doRgb2gray = require('cwise/lib/wrapper')({"args":["array","array","array","array"],"pre":{"body":"{}","args":[],"thisVars":[],"localVars":[]},"body":{"body":"{_inline_79_arg0_=4899*_inline_79_arg1_+9617*_inline_79_arg2_+1868*_inline_79_arg3_+8192>>14}","args":[{"name":"_inline_79_arg0_","lvalue":true,"rvalue":false,"count":1},{"name":"_inline_79_arg1_","lvalue":false,"rvalue":true,"count":1},{"name":"_inline_79_arg2_","lvalue":false,"rvalue":true,"count":1},{"name":"_inline_79_arg3_","lvalue":false,"rvalue":true,"count":1}],"thisVars":[],"localVars":[]},"post":{"body":"{}","args":[],"thisVars":[],"localVars":[]},"debug":false,"funcName":"rgb2grayCwise","blockSize":64});
+var doRgb2gray = require('cwise/lib/wrapper')({"args":["array","array","array","array"],"pre":{"body":"{}","args":[],"thisVars":[],"localVars":[]},"body":{"body":"{_inline_76_arg0_=4899*_inline_76_arg1_+9617*_inline_76_arg2_+1868*_inline_76_arg3_+8192>>14}","args":[{"name":"_inline_76_arg0_","lvalue":true,"rvalue":false,"count":1},{"name":"_inline_76_arg1_","lvalue":false,"rvalue":true,"count":1},{"name":"_inline_76_arg2_","lvalue":false,"rvalue":true,"count":1},{"name":"_inline_76_arg3_","lvalue":false,"rvalue":true,"count":1}],"thisVars":[],"localVars":[]},"post":{"body":"{}","args":[],"thisVars":[],"localVars":[]},"debug":false,"funcName":"rgb2grayCwise","blockSize":64});
 
 /**
  * Compute Grayscale version of an RGB image.
@@ -22597,14 +22110,14 @@ module.exports = function rgb2gray (img) {
   return out;
 };
 
-},{"../ndarray":42,"../utils":43,"cwise/lib/wrapper":7}],35:[function(require,module,exports){
+},{"../ndarray":39,"../utils":40,"cwise/lib/wrapper":7}],32:[function(require,module,exports){
 'use strict';
 
 
 var NdArray = require('../ndarray');
 var rgb2gray = require('./rgb2gray');
 
-var doIntegrate = require('cwise/lib/wrapper')({"args":["array","array","index",{"offset":[-1,-1],"array":0},{"offset":[-1,0],"array":0},{"offset":[0,-1],"array":0}],"pre":{"body":"{}","args":[],"thisVars":[],"localVars":[]},"body":{"body":"{_inline_67_arg0_=0!==_inline_67_arg2_[0]&&0!==_inline_67_arg2_[1]?_inline_67_arg1_+_inline_67_arg4_+_inline_67_arg5_-_inline_67_arg3_:0===_inline_67_arg2_[0]&&0===_inline_67_arg2_[1]?_inline_67_arg1_:0===_inline_67_arg2_[0]?_inline_67_arg1_+_inline_67_arg5_:_inline_67_arg1_+_inline_67_arg4_}","args":[{"name":"_inline_67_arg0_","lvalue":true,"rvalue":false,"count":1},{"name":"_inline_67_arg1_","lvalue":false,"rvalue":true,"count":4},{"name":"_inline_67_arg2_","lvalue":false,"rvalue":true,"count":5},{"name":"_inline_67_arg3_","lvalue":false,"rvalue":true,"count":1},{"name":"_inline_67_arg4_","lvalue":false,"rvalue":true,"count":2},{"name":"_inline_67_arg5_","lvalue":false,"rvalue":true,"count":2}],"thisVars":[],"localVars":[]},"post":{"body":"{}","args":[],"thisVars":[],"localVars":[]},"debug":false,"funcName":"doIntegrateBody","blockSize":64});
+var doIntegrate = require('cwise/lib/wrapper')({"args":["array","array","index",{"offset":[-1,-1],"array":0},{"offset":[-1,0],"array":0},{"offset":[0,-1],"array":0}],"pre":{"body":"{}","args":[],"thisVars":[],"localVars":[]},"body":{"body":"{_inline_73_arg0_=0!==_inline_73_arg2_[0]&&0!==_inline_73_arg2_[1]?_inline_73_arg1_+_inline_73_arg4_+_inline_73_arg5_-_inline_73_arg3_:0===_inline_73_arg2_[0]&&0===_inline_73_arg2_[1]?_inline_73_arg1_:0===_inline_73_arg2_[0]?_inline_73_arg1_+_inline_73_arg5_:_inline_73_arg1_+_inline_73_arg4_}","args":[{"name":"_inline_73_arg0_","lvalue":true,"rvalue":false,"count":1},{"name":"_inline_73_arg1_","lvalue":false,"rvalue":true,"count":4},{"name":"_inline_73_arg2_","lvalue":false,"rvalue":true,"count":5},{"name":"_inline_73_arg3_","lvalue":false,"rvalue":true,"count":1},{"name":"_inline_73_arg4_","lvalue":false,"rvalue":true,"count":2},{"name":"_inline_73_arg5_","lvalue":false,"rvalue":true,"count":2}],"thisVars":[],"localVars":[]},"post":{"body":"{}","args":[],"thisVars":[],"localVars":[]},"debug":false,"funcName":"doIntegrateBody","blockSize":64});
 
 /**
  * Compute Sum Area Table, also known as the integral of the image
@@ -22623,7 +22136,7 @@ module.exports = function computeSumAreaTable (img) {
   return out;
 };
 
-},{"../ndarray":42,"./rgb2gray":34,"cwise/lib/wrapper":7}],36:[function(require,module,exports){
+},{"../ndarray":39,"./rgb2gray":31,"cwise/lib/wrapper":7}],33:[function(require,module,exports){
 'use strict';
 
 var _ = require('./utils');
@@ -22656,7 +22169,7 @@ module.exports = function saveImageDom (img, dest) {
   }
 };
 
-},{"../errors":25,"./utils":40}],37:[function(require,module,exports){
+},{"../errors":23,"./utils":37}],34:[function(require,module,exports){
 'use strict';
 
 
@@ -22665,7 +22178,7 @@ var NdArray = require('../ndarray');
 var __ = require('../utils');
 var rgb2gray = require('./rgb2gray');
 
-var doScharr = require('cwise/lib/wrapper')({"args":["array","array",{"offset":[-1,-1],"array":1},{"offset":[-1,0],"array":1},{"offset":[-1,1],"array":1},{"offset":[0,-1],"array":1},{"offset":[0,1],"array":1},{"offset":[1,-1],"array":1},{"offset":[1,0],"array":1},{"offset":[1,1],"array":1}],"pre":{"body":"{}","args":[],"thisVars":[],"localVars":[]},"body":{"body":"{var _inline_76_q=3*_inline_76_arg2_+10*_inline_76_arg3_+3*_inline_76_arg4_-3*_inline_76_arg7_-10*_inline_76_arg8_-3*_inline_76_arg9_,_inline_76_s=3*_inline_76_arg2_-3*_inline_76_arg4_+10*_inline_76_arg5_-10*_inline_76_arg6_+3*_inline_76_arg7_-3*_inline_76_arg9_;_inline_76_arg0_=Math.sqrt(_inline_76_s*_inline_76_s+_inline_76_q*_inline_76_q)}","args":[{"name":"_inline_76_arg0_","lvalue":true,"rvalue":false,"count":1},{"name":"_inline_76_arg1_","lvalue":false,"rvalue":false,"count":0},{"name":"_inline_76_arg2_","lvalue":false,"rvalue":true,"count":2},{"name":"_inline_76_arg3_","lvalue":false,"rvalue":true,"count":1},{"name":"_inline_76_arg4_","lvalue":false,"rvalue":true,"count":2},{"name":"_inline_76_arg5_","lvalue":false,"rvalue":true,"count":1},{"name":"_inline_76_arg6_","lvalue":false,"rvalue":true,"count":1},{"name":"_inline_76_arg7_","lvalue":false,"rvalue":true,"count":2},{"name":"_inline_76_arg8_","lvalue":false,"rvalue":true,"count":1},{"name":"_inline_76_arg9_","lvalue":false,"rvalue":true,"count":2}],"thisVars":[],"localVars":["_inline_76_q","_inline_76_s"]},"post":{"body":"{}","args":[],"thisVars":[],"localVars":[]},"debug":false,"funcName":"doSobelBody","blockSize":64});
+var doScharr = require('cwise/lib/wrapper')({"args":["array","array",{"offset":[-1,-1],"array":1},{"offset":[-1,0],"array":1},{"offset":[-1,1],"array":1},{"offset":[0,-1],"array":1},{"offset":[0,1],"array":1},{"offset":[1,-1],"array":1},{"offset":[1,0],"array":1},{"offset":[1,1],"array":1}],"pre":{"body":"{}","args":[],"thisVars":[],"localVars":[]},"body":{"body":"{var _inline_79_q=3*_inline_79_arg2_+10*_inline_79_arg3_+3*_inline_79_arg4_-3*_inline_79_arg7_-10*_inline_79_arg8_-3*_inline_79_arg9_,_inline_79_s=3*_inline_79_arg2_-3*_inline_79_arg4_+10*_inline_79_arg5_-10*_inline_79_arg6_+3*_inline_79_arg7_-3*_inline_79_arg9_;_inline_79_arg0_=Math.sqrt(_inline_79_s*_inline_79_s+_inline_79_q*_inline_79_q)}","args":[{"name":"_inline_79_arg0_","lvalue":true,"rvalue":false,"count":1},{"name":"_inline_79_arg1_","lvalue":false,"rvalue":false,"count":0},{"name":"_inline_79_arg2_","lvalue":false,"rvalue":true,"count":2},{"name":"_inline_79_arg3_","lvalue":false,"rvalue":true,"count":1},{"name":"_inline_79_arg4_","lvalue":false,"rvalue":true,"count":2},{"name":"_inline_79_arg5_","lvalue":false,"rvalue":true,"count":1},{"name":"_inline_79_arg6_","lvalue":false,"rvalue":true,"count":1},{"name":"_inline_79_arg7_","lvalue":false,"rvalue":true,"count":2},{"name":"_inline_79_arg8_","lvalue":false,"rvalue":true,"count":1},{"name":"_inline_79_arg9_","lvalue":false,"rvalue":true,"count":2}],"thisVars":[],"localVars":["_inline_79_q","_inline_79_s"]},"post":{"body":"{}","args":[],"thisVars":[],"localVars":[]},"debug":false,"funcName":"doSobelBody","blockSize":64});
 
 /**
  * Find the edge magnitude using the Scharr transform.
@@ -22695,7 +22208,7 @@ module.exports = function computeScharr (img) {
   return out.divide(16 * Math.sqrt(2), false);
 };
 
-},{"../ndarray":42,"../utils":43,"./rgb2gray":34,"cwise/lib/wrapper":7,"ndarray-ops":17}],38:[function(require,module,exports){
+},{"../ndarray":39,"../utils":40,"./rgb2gray":31,"cwise/lib/wrapper":7,"ndarray-ops":17}],35:[function(require,module,exports){
 'use strict';
 
 
@@ -22736,14 +22249,14 @@ module.exports = function computeSobel (img) {
   return out.divide(4 * Math.sqrt(2), false);
 };
 
-},{"../ndarray":42,"../utils":43,"./rgb2gray":34,"cwise/lib/wrapper":7,"ndarray-ops":17}],39:[function(require,module,exports){
+},{"../ndarray":39,"../utils":40,"./rgb2gray":31,"cwise/lib/wrapper":7,"ndarray-ops":17}],36:[function(require,module,exports){
 'use strict';
 
 
 var NdArray = require('../ndarray');
 var rgb2gray = require('./rgb2gray');
 
-var doIntegrate = require('cwise/lib/wrapper')({"args":["array","array","index",{"offset":[-1,-1],"array":0},{"offset":[-1,0],"array":0},{"offset":[0,-1],"array":0}],"pre":{"body":"{}","args":[],"thisVars":[],"localVars":[]},"body":{"body":"{_inline_73_arg0_=0!==_inline_73_arg2_[0]&&0!==_inline_73_arg2_[1]?_inline_73_arg1_*_inline_73_arg1_+_inline_73_arg4_+_inline_73_arg5_-_inline_73_arg3_:0===_inline_73_arg2_[0]&&0===_inline_73_arg2_[1]?_inline_73_arg1_*_inline_73_arg1_:0===_inline_73_arg2_[0]?_inline_73_arg1_*_inline_73_arg1_+_inline_73_arg5_:_inline_73_arg1_*_inline_73_arg1_+_inline_73_arg4_}","args":[{"name":"_inline_73_arg0_","lvalue":true,"rvalue":false,"count":1},{"name":"_inline_73_arg1_","lvalue":false,"rvalue":true,"count":8},{"name":"_inline_73_arg2_","lvalue":false,"rvalue":true,"count":5},{"name":"_inline_73_arg3_","lvalue":false,"rvalue":true,"count":1},{"name":"_inline_73_arg4_","lvalue":false,"rvalue":true,"count":2},{"name":"_inline_73_arg5_","lvalue":false,"rvalue":true,"count":2}],"thisVars":[],"localVars":[]},"post":{"body":"{}","args":[],"thisVars":[],"localVars":[]},"debug":false,"funcName":"doIntegrateBody","blockSize":64});
+var doIntegrate = require('cwise/lib/wrapper')({"args":["array","array","index",{"offset":[-1,-1],"array":0},{"offset":[-1,0],"array":0},{"offset":[0,-1],"array":0}],"pre":{"body":"{}","args":[],"thisVars":[],"localVars":[]},"body":{"body":"{_inline_67_arg0_=0!==_inline_67_arg2_[0]&&0!==_inline_67_arg2_[1]?_inline_67_arg1_*_inline_67_arg1_+_inline_67_arg4_+_inline_67_arg5_-_inline_67_arg3_:0===_inline_67_arg2_[0]&&0===_inline_67_arg2_[1]?_inline_67_arg1_*_inline_67_arg1_:0===_inline_67_arg2_[0]?_inline_67_arg1_*_inline_67_arg1_+_inline_67_arg5_:_inline_67_arg1_*_inline_67_arg1_+_inline_67_arg4_}","args":[{"name":"_inline_67_arg0_","lvalue":true,"rvalue":false,"count":1},{"name":"_inline_67_arg1_","lvalue":false,"rvalue":true,"count":8},{"name":"_inline_67_arg2_","lvalue":false,"rvalue":true,"count":5},{"name":"_inline_67_arg3_","lvalue":false,"rvalue":true,"count":1},{"name":"_inline_67_arg4_","lvalue":false,"rvalue":true,"count":2},{"name":"_inline_67_arg5_","lvalue":false,"rvalue":true,"count":2}],"thisVars":[],"localVars":[]},"post":{"body":"{}","args":[],"thisVars":[],"localVars":[]},"debug":false,"funcName":"doIntegrateBody","blockSize":64});
 
 /**
  * Compute Squared Sum Area Table, also known as the integral of the squared image
@@ -22763,7 +22276,7 @@ module.exports = function computeSquaredSumAreaTable (img) {
   return out;
 };
 
-},{"../ndarray":42,"./rgb2gray":34,"cwise/lib/wrapper":7}],40:[function(require,module,exports){
+},{"../ndarray":39,"./rgb2gray":31,"cwise/lib/wrapper":7}],37:[function(require,module,exports){
 'use strict';
 
 var NdArray = require('../ndarray');
@@ -22882,7 +22395,7 @@ module.exports.setRawData = function setRawData (array, data) {
   }
 };
 
-},{"../ndarray":42}],41:[function(require,module,exports){
+},{"../ndarray":39}],38:[function(require,module,exports){
 'use strict';
 
 var ndarray = require('ndarray');
@@ -23725,7 +23238,7 @@ module.exports = {
   images: require('./images')
 };
 
-},{"./config":23,"./dtypes":24,"./errors":25,"./images":30,"./ndarray":42,"./utils":43,"cwise/lib/wrapper":7,"ndarray":18,"ndarray-fft":13,"ndarray-ops":17}],42:[function(require,module,exports){
+},{"./config":21,"./dtypes":22,"./errors":23,"./images":27,"./ndarray":39,"./utils":40,"cwise/lib/wrapper":7,"ndarray":18,"ndarray-fft":13,"ndarray-ops":17}],39:[function(require,module,exports){
 'use strict';
 
 var ndarray = require('ndarray');
@@ -24791,7 +24304,7 @@ function formatNumber (v) {
   return String(Number((v || 0).toFixed(CONF.nFloatingValues)));
 }
 
-},{"./config":23,"./errors":25,"./utils":43,"cwise/lib/wrapper":7,"ndarray":18,"ndarray-fft":13,"ndarray-gemm":15,"ndarray-ops":17,"typedarray-pool":21}],43:[function(require,module,exports){
+},{"./config":21,"./errors":23,"./utils":40,"cwise/lib/wrapper":7,"ndarray":18,"ndarray-fft":13,"ndarray-gemm":15,"ndarray-ops":17,"typedarray-pool":19}],40:[function(require,module,exports){
 'use strict';
 var DTYPES = require('./dtypes');
 var _ = require('lodash');
@@ -24884,5 +24397,5 @@ module.exports = {
   defaults: _.defaults
 };
 
-},{"./dtypes":24,"lodash":12}]},{},[41])(41)
+},{"./dtypes":22,"lodash":12}]},{},[38])(38)
 });

@@ -9,7 +9,6 @@
  */
 
 module.exports = {
-  data: require('./data'),
   read: require('./read'),
   save: require('./save'),
   resize: require('./resize'),
