@@ -1149,16 +1149,27 @@ function initNativeArray (shape, i) {
   return result;
 }
 
+// fix for hermes
+// https://github.com/facebook/hermes/issues/954
+function unpackCwise (arr, a, idx) {
+  "show source";
+  var v = a;
+  var i;
+  for (i = 0; i < idx.length - 1; ++i) {
+    v = v[idx[i]];
+  }
+  v[idx[idx.length - 1]] = arr;
+}
+
+function no_op () {
+  "show source";
+}
+
 var doUnpack = cwise({
   args: ['array', 'scalar', 'index'],
-  body: function unpackCwise (arr, a, idx) {
-    var v = a;
-    var i;
-    for (i = 0; i < idx.length - 1; ++i) {
-      v = v[idx[i]];
-    }
-    v[idx[idx.length - 1]] = arr;
-  }
+  pre: no_op,
+  post: no_op,
+  body: unpackCwise,
 });
 
 function unpackArray (arr) {
